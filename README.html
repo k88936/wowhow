@@ -1,0 +1,157 @@
+<h1 id="report">report</h1>
+<p>by 王德宇 2024013267 ## 1.introduction This is a report for my lisp
+implementation “WowHow” for “王浩算法”.<br />
+It is designed to be an interactive environment for testing logic. ##
+2.usage ### 2.1. Installation using any lisp interpreter to load the
+file “wowhow.lisp”<br />
+take sbcl for example:</p>
+<pre class="shell"><code>sbcl --load wowhow.lisp</code></pre>
+<h3 id="commands">2.2. Commands</h3>
+<ul>
+<li>to define a symbol as a variable:
+<code>lisp     (declvar P)</code></li>
+<li>to check a statement:
+<code>lisp     (check `(s-rightarrow &lt;left&gt; &lt;right&gt;))</code>
+which will return all right or failed. where <code>&lt;left&gt;</code>
+and <code>&lt;right&gt;</code> are expressions. ### 2.3. Syntax</li>
+<li><span
+class="math inline"><em>P</em><em>s</em> ⇒ <em>Q</em></span><br />
+<code>lisp     (s-rightarrow P Q)</code></li>
+<li><span class="math inline"><em>P</em> ∨ <em>Q</em></span><br />
+<code>lisp     (lor P Q)</code></li>
+<li><span class="math inline"><em>P</em> ∧ <em>Q</em></span><br />
+<code>lisp     (land P Q)</code></li>
+<li><span class="math inline">¬<em>P</em></span><br />
+<code>lisp     (neg P)</code></li>
+<li><span class="math inline"><em>P</em> → <em>Q</em></span><br />
+<code>lisp     (rightarrow P Q)</code></li>
+<li><span class="math inline"><em>P</em> ↔︎ <em>Q</em></span><br />
+<code>lisp     (leftrightarrow P Q)</code> ### 2.4. Example <span
+class="math inline">(<em>P</em>∨<em>Q</em>) ⇒ (<em>Q</em>∨<em>P</em>)</span></li>
+</ul>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode lisp"><code class="sourceCode commonlisp"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>(declvar P)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>(declvar Q)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>(check `(s-rightarrow (lor P Q) (lor Q P)))</span></code></pre></div>
+<p>returns:</p>
+<pre><code>passed: #(0 0 -1 2 1)
+passed: #(0 0 -2 2 1)
+all right</code></pre>
+<h2 id="implementation">3. Implementation</h2>
+<h3 id="overview">3.1. Overview:</h3>
+<pre class="mermaid"><code>graph TD
+    X[start] --&gt; Y[pick a branch]
+    Y --&gt; A[transform according to rules]
+    A --&gt; B[branch s-rightarrow expresion]
+    A --&gt; C[simplify subexpression]
+    C --&gt; D
+    B --&gt; D[at the end of one branch]
+    D --&gt; P[check the simplified expression if all right or failed]
+    P --&gt; T[end]
+    P --&gt;Y</code></pre>
+<h3 id="difficulties">3.2. Difficulties:</h3>
+<ol type="1">
+<li>invoke functions from father to child to determine the pos (left or
+right) of a expression.<br />
+solution: use lambda to reverse the order of invoking. each exporession
+is wrapped by two lambda : operation lambda and construct lambda.</li>
+<li>operate the expression<br />
+solution: transfer the context (to move the sub expression) and contexts
+(to branch a new s-rightarrow expression) via lambda. ### 3.3.
+Details:</li>
+</ol>
+<h4 id="framework">3.3.1 framework</h4>
+<ul>
+<li>main loop</li>
+</ul>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode lisp"><code class="sourceCode commonlisp"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>(<span class="kw">defun</span><span class="fu"> check </span>(<span class="kw">exp</span>)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    (<span class="kw">let</span> ((contexts (<span class="kw">make-array</span> <span class="dv">0</span>  :fill-pointer <span class="dv">0</span> <span class="bu">:adjustable</span> <span class="kw">t</span> )))</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>      (<span class="kw">vector-push-extend</span> (<span class="kw">make-array</span> <span class="dv">0</span>  :fill-pointer <span class="dv">0</span> <span class="bu">:adjustable</span> <span class="kw">t</span> ) contexts )</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>      (<span class="kw">funcall</span> (<span class="kw">eval</span> <span class="kw">exp</span> ) (<span class="kw">elt</span> contexts <span class="dv">0</span>))</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>      <span class="co">;invoke the construct lambda of s-rightarrow expression to init.</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>      (dovector (i contexts)</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>        <span class="co">;multiple branches is saved in a outer loop</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>        (<span class="kw">let</span> (ret(context (<span class="kw">elt</span> contexts i))(flag (<span class="kw">make-array</span> (<span class="op">1+</span> *var-index*) :fill-pointer <span class="dv">0</span>)))</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>          (<span class="kw">dotimes</span> (j (<span class="op">1+</span> *var-index*)) (<span class="kw">vector-push</span>  (<span class="kw">vector</span> <span class="dv">0</span> <span class="dv">0</span>) flag))</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>          (dovector  (j context)</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>            (<span class="kw">let</span> ((func (<span class="kw">elt</span> context j)))</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>            <span class="co">;travel the sub expressions</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>            (<span class="kw">setf</span> ret (<span class="kw">if</span> (<span class="kw">typep</span> func <span class="dt">&#39;function</span> )</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>                        (<span class="kw">progn</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>                          (<span class="kw">setf</span>  (<span class="kw">elt</span> context j) <span class="dv">0</span>)i<span class="co">;set the pos to 0 in case of infinite branch</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>                          (<span class="kw">setf</span> (<span class="kw">elt</span> context j)   (<span class="kw">funcall</span> func  context contexts)))</span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>                        <span class="co">;this is the main point. the operation lambda invoked here did these:</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>                        <span class="co">;1.judge  : according his pos and rule, invoke the construct lambda (form left and right) get two operation lambda</span></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>                        <span class="co">;2.insert : insert the two operation lambda to the current context  or even a branch context</span></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>                        <span class="co">;3.return : if the sub expression is a variable, return the unique code of the variable if a lambda return 0, all this is for check later</span></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>                        func )))</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>            (<span class="kw">incf</span> (<span class="kw">elt</span>(<span class="kw">elt</span> flag (<span class="kw">abs</span> ret)) (<span class="kw">if</span> (<span class="op">&gt;</span> ret <span class="dv">0</span>) <span class="dv">0</span> <span class="dv">1</span>))))</span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a>          (<span class="kw">if</span> (<span class="op">=</span> <span class="dv">1</span> (<span class="kw">count-if</span> (<span class="kw">lambda</span> (x) (<span class="op">=</span> <span class="dv">1</span> (<span class="kw">min</span> (<span class="kw">elt</span> x <span class="dv">0</span>) (<span class="kw">elt</span> x <span class="dv">1</span>))))   flag <span class="bu">:start</span> <span class="dv">1</span>))<span class="co">;check part :determine if there is some  only same variable between left and right</span></span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>              (<span class="kw">progn</span></span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true" tabindex="-1"></a>                (<span class="kw">format</span> <span class="kw">t</span> <span class="st">&quot;passed: ~S ~&amp;&quot;</span> context)</span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true" tabindex="-1"></a>                (<span class="kw">progn</span> (<span class="kw">format</span> <span class="kw">t</span> <span class="st">&quot;failed: ~S ~&amp;&quot;</span> context) (<span class="kw">return-from</span> check )))))) </span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true" tabindex="-1"></a>            (<span class="kw">format</span> <span class="kw">t</span> <span class="st">&quot;passed: ~S ~&amp;&quot;</span> context)</span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true" tabindex="-1"></a>            (<span class="kw">progn</span> (<span class="kw">format</span> <span class="kw">t</span> <span class="st">&quot;failed: ~S ~&amp;&quot;</span> context) (<span class="kw">return-from</span> check ))))))</span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true" tabindex="-1"></a>  (<span class="kw">format</span> <span class="kw">t</span> <span class="st">&quot;all right~&amp;&quot;</span>))</span></code></pre></div>
+<ul>
+<li>construct lambda of s-rightarrow</li>
+</ul>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode lisp"><code class="sourceCode commonlisp"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>(<span class="kw">defun</span><span class="fu"> s-rightarrow</span>(left right)</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    (<span class="kw">lambda</span> (context)</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>      (<span class="kw">vector-push-extend</span> (<span class="kw">funcall</span> left <span class="op">-</span><span class="dv">1</span> ) context )</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>      (<span class="kw">vector-push-extend</span> (<span class="kw">funcall</span> right <span class="dv">1</span> ) context )))</span></code></pre></div>
+<ul>
+<li>dynamic travel a vector to allow insert</li>
+</ul>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode lisp"><code class="sourceCode commonlisp"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>(<span class="kw">defmacro</span><span class="fu"> dovector </span>((index <span class="kw">vector</span>)  &amp;body body)</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  `(<span class="kw">do</span> ((,index  <span class="dv">0</span> (<span class="op">1+</span> ,index)))</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>       ((<span class="op">&gt;=</span> ,index  (<span class="kw">length</span> ,<span class="kw">vector</span>)))</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>     ,@body ))</span></code></pre></div>
+<h4 id="macro-for-define-rules">3.3.1 macro for define rules</h4>
+<ol type="1">
+<li>base for defining rules: delay the invoking.</li>
+</ol>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode lisp"><code class="sourceCode commonlisp"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>(<span class="kw">defmacro</span><span class="fu"> with-delay </span>( &amp;key at-left at-left1 at-right at-right1)</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  `(<span class="kw">lambda</span> (lr)</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>     (<span class="kw">lambda</span> (context contexts)</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>        (<span class="kw">if</span>  (<span class="op">=</span> lr <span class="op">-</span><span class="dv">1</span>) (<span class="kw">progn</span> ,at-left1 ,at-left)</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>                        (<span class="kw">progn</span> ,at-right1 ,at-right) ))))</span></code></pre></div>
+<ol start="2" type="1">
+<li>abstact the operation</li>
+</ol>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode lisp"><code class="sourceCode commonlisp"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>(<span class="kw">defmacro</span><span class="fu"> push-to-context </span>( v1 lr1 &amp;optional v2 lr2 )</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  (<span class="kw">if</span> (<span class="kw">eq</span> lr2 <span class="kw">nil</span>)</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>      `(<span class="kw">progn</span> (<span class="kw">vector-push-extend</span> (<span class="kw">funcall</span>  ,v1 ,lr1)  context ) <span class="dv">0</span> )</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>      `(<span class="kw">progn</span> (<span class="kw">vector-push-extend</span> (<span class="kw">funcall</span>  ,v1 ,lr1)  context )  (<span class="kw">vector-push-extend</span> (<span class="kw">funcall</span>  ,v2 ,lr2)  context ) <span class="dv">0</span>)))</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>(<span class="kw">defmacro</span><span class="fu"> push-to-branch </span>( v1 lr1 &amp;optional  v2 lr2 )</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>   `(<span class="kw">progn</span> (<span class="kw">let*</span> ((len (<span class="kw">length</span> context))(branch (<span class="kw">make-array</span> len  :fill-pointer len  <span class="bu">:adjustable</span> <span class="kw">t</span>)))</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>                (<span class="kw">dotimes</span> (i len)</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>                  (<span class="kw">setf</span> (<span class="kw">elt</span> branch i) (<span class="kw">elt</span> context i)))</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>                  ,@(<span class="kw">if</span> (<span class="kw">eq</span> lr2 <span class="kw">nil</span>)</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>                    `((<span class="kw">vector-push-extend</span> (<span class="kw">funcall</span>  ,v1 ,lr1)  branch) )</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>                    `((<span class="kw">vector-push-extend</span> (<span class="kw">funcall</span>  ,v1 ,lr1)   branch) (<span class="kw">vector-push-extend</span> (<span class="kw">funcall</span>  ,v2 ,lr2)   branch)))</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>                (<span class="kw">vector-push-extend</span> branch contexts ))</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>           <span class="dv">0</span>))</span></code></pre></div>
+<ol start="3" type="1">
+<li>compose 1 and 2</li>
+</ol>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode lisp"><code class="sourceCode commonlisp"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>(<span class="kw">defun</span><span class="fu">  neg </span>(left)</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  (with-delay</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>   :at-left (push-to-context left <span class="dv">1</span> ):at-right (push-to-context left <span class="op">-</span><span class="dv">1</span>)))</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>(<span class="kw">defun</span><span class="fu"> lor </span>(left right)</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  (with-delay</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    :at-left (push-to-context left <span class="op">-</span><span class="dv">1</span>):at-left1 (push-to-branch right <span class="op">-</span><span class="dv">1</span>):at-right (push-to-context left <span class="dv">1</span> right <span class="dv">1</span>)))</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>(<span class="kw">defun</span><span class="fu"> land </span>(left right)</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>  (with-delay</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>    :at-left (push-to-context left <span class="op">-</span><span class="dv">1</span> right <span class="op">-</span><span class="dv">1</span>):at-right (push-to-context left <span class="dv">1</span>):at-right1 (push-to-branch right <span class="dv">1</span>)))</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>(<span class="kw">defun</span><span class="fu"> rightarrow </span>(left right)</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>  (with-delay</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>    :at-left (push-to-context right <span class="op">-</span><span class="dv">1</span>):at-left1 (push-to-branch left <span class="dv">1</span>):at-right (push-to-context left <span class="op">-</span><span class="dv">1</span> right <span class="dv">1</span>)))</span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>(<span class="kw">defun</span><span class="fu"> leftrightarrow </span>(left right )</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>  (with-delay :at-left (push-to-context left <span class="op">-</span><span class="dv">1</span> right <span class="op">-</span><span class="dv">1</span>):at-right (push-to-branch left <span class="dv">1</span> right <span class="dv">1</span>)))</span></code></pre></div>
